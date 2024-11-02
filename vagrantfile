@@ -1,0 +1,78 @@
+# Vagrantfile
+Vagrant.configure("2") do |config|
+
+    # Configuración para la primera máquina con Apache
+    config.vm.define "web1" do |web1|
+      web1.vm.box = "ubuntu/bionic64"
+      web1.vm.hostname = "web1"
+      web1.vm.network "private_network", ip: "192.168.50.4"
+      web1.vm.provider "virtualbox" do |vb|
+        vb.memory = 512
+        vb.cpus = 1
+      end
+  
+      # Instalación de Apache
+      web1.vm.provision "shell", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y apache2
+      SHELL
+  
+      # Directorio compartido
+      web1.vm.synced_folder "./web_content", "/var/www/html"
+    end
+  
+    # Configuración para la segunda máquina con Apache
+    config.vm.define "web2" do |web2|
+      web2.vm.box = "ubuntu/bionic64"
+      web2.vm.hostname = "web2"
+      web2.vm.network "private_network", ip: "192.168.50.5"
+      web2.vm.provider "virtualbox" do |vb|
+        vb.memory = 512
+        vb.cpus = 1
+      end
+  
+      # Instalación de Apache
+      web2.vm.provision "shell", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y apache2
+      SHELL
+  
+      # Directorio compartido
+      web2.vm.synced_folder "./web_content", "/var/www/html"
+    end
+  
+    # Configuración para la tercera máquina con Nginx como balanceador de carga
+    config.vm.define "load_balancer" do |lb|
+      lb.vm.box = "ubuntu/bionic64"
+      lb.vm.hostname = "load_balancer"
+      lb.vm.network "private_network", ip: "192.168.50.6"
+      lb.vm.provider "virtualbox" do |vb|
+        vb.memory = 512
+        vb.cpus = 1
+      end
+  
+      # Instalación de Nginx y configuración de balanceo de carga
+      lb.vm.provision "shell", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y nginx
+        sudo rm /etc/nginx/sites-enabled/default
+        cat <<EOL | sudo tee /etc/nginx/conf.d/load_balancer.conf
+  upstream web_servers {
+      server 192.168.50.4;
+      server 192.168.50.5;
+  }
+  
+  server {
+      listen 80;
+  
+      location / {
+          proxy_pass http://web_servers;
+      }
+  }
+  EOL
+        sudo systemctl restart nginx
+      SHELL
+    end
+  
+  end
+  
